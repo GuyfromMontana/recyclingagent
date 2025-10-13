@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import API_BASE_URL from '../../utils/api';
 
 export default function PricingEditor() {
   const [materials, setMaterials] = useState([]);
@@ -29,7 +30,7 @@ export default function PricingEditor() {
   const fetchMaterials = async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('http://localhost:4000/api/pricing', {
+      const response = await fetch(`${API_BASE_URL}/pricing`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -57,7 +58,7 @@ export default function PricingEditor() {
   const handleSave = async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:4000/api/pricing/${editingId}`, {
+      const response = await fetch(`${API_BASE_URL}/pricing/${editingId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

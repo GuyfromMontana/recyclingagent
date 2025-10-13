@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import API_BASE_URL from '../../utils/api';
 
 export default function KnowledgeEditor() {
   const [knowledge, setKnowledge] = useState([]);
@@ -31,7 +32,7 @@ export default function KnowledgeEditor() {
   const fetchKnowledge = async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('http://localhost:4000/api/recycle-knowledge', {
+      const response = await fetch(`${API_BASE_URL}/recycle-knowledge`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -60,7 +61,7 @@ export default function KnowledgeEditor() {
     setSaving(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:4000/api/recycle-knowledge/${editingId}`, {
+      const response = await fetch(`${API_BASE_URL}/recycle-knowledge/${editingId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

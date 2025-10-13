@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import API_BASE_URL from '../../utils/api';
 
 export default function Dashboard({ onNavigate }) {
   const [stats, setStats] = useState({
@@ -23,15 +24,15 @@ export default function Dashboard({ onNavigate }) {
       };
 
       // Fetch material pricing stats
-      const pricingRes = await fetch('http://localhost:4000/api/pricing', { headers });
+      const pricingRes = await fetch(`${API_BASE_URL}/pricing`, { headers });
       const pricingData = await pricingRes.json();
       
       // Fetch knowledge base stats
-      const knowledgeRes = await fetch('http://localhost:4000/api/recycle-knowledge', { headers });
+      const knowledgeRes = await fetch(`${API_BASE_URL}/recycle-knowledge`, { headers });
       const knowledgeData = await knowledgeRes.json();
       
       // Fetch call logs stats
-      const callsRes = await fetch('http://localhost:4000/api/conversations', { headers });
+      const callsRes = await fetch(`${API_BASE_URL}/conversations`, { headers });
       const callsData = await callsRes.json();
 
       setStats({

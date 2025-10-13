@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import API_BASE_URL from '../../utils/api';
 
 export default function CallLogs() {
   const [conversations, setConversations] = useState([]);
@@ -30,8 +31,8 @@ export default function CallLogs() {
     try {
       const token = localStorage.getItem('authToken');
       const url = statusFilter === 'all' 
-        ? 'http://localhost:4000/api/conversations'
-        : `http://localhost:4000/api/conversations?status=${statusFilter}`;
+        ? `${API_BASE_URL}/conversations`
+        : `${API_BASE_URL}/conversations?status=${statusFilter}`;
       
       const response = await fetch(url, {
         headers: {
@@ -65,7 +66,7 @@ export default function CallLogs() {
   const viewCallDetails = async (callId) => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:4000/api/conversations/${callId}`, {
+      const response = await fetch(`${API_BASE_URL}/conversations/${callId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
