@@ -27,31 +27,45 @@ export default async function handler(req, res) {
       });
     }
 
-    // Search for the material in the database
-    const { data, error } = await supabase
+    // First, search for pricing information
+    const { data: pricingData, error: pricingError } = await supabase
       .from('material_pricing')
       .select('*')
       .ilike('question', `%${material}%`)
-      .limit(1)
-      .single();
+      .limit(1);
 
-    // Handle database errors
-    if (error) {
-      console.error('Supabase error:', error);
-      return res.status(404).json({ 
-        success: false, 
-        message: `I don't have pricing information for ${material}. Please call our team at 406-543-1905.`,
-        result: `I don't have pricing information for ${material}. Please call our team at 406-543-1905.`
+    // If we found pricing data, return it
+    if (pricingData && pricingData.length > 0) {
+      const response = pricingData[0].answer_voice || pricingData[0].answer_long || pricingData[0].answer;
+      return res.status(200).json({ 
+        success: true,
+        result: response,
+        data: pricingData[0]
       });
     }
 
-    // Format the response for Vapi
-    const response = '${data.answer}`.trim();
+    // If no pricing found, search the knowledge base
+    const { data: knowledgeData, error: knowledgeError } = await supabase
+      .from('recycle_knowledge')
+      .select('*')
+      .ilike('question', `%${material}%`)
+      .limit(1);
 
-    return res.status(200).json({ 
-      success: true,
-      result: response,
-      data: data
+    // If we found knowledge base data, return it
+    if (knowledgeData && knowledgeData.length > 0) {
+      const response = knowledgeData[0].answer_voice || knowledgeData[0].answer_long || knowledgeData[0].answer;
+      return res.status(200).json({ 
+        success: true,
+        result: response,
+        data: knowledgeData[0]
+      });
+    }
+
+    // If nothing found in either table
+    return res.status(404).json({ 
+      success: false, 
+      message: `I don't have information about ${material}. Please call our team at 406-543-1905.`,
+      result: `I don't have information about ${material}. Please call our team at 406-543-1905.`
     });
 
   } catch (error) {
