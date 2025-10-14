@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
   try {
     // Get the material from the request body
-    const { material } = req.body;
+    let { material } = req.body;
 
     // Check if material was provided
     if (!material) {
@@ -27,8 +27,15 @@ export default async function handler(req, res) {
       });
     }
 
+    // Normalize the search term to help with variations
+    // Convert "number 1" or "number one" to "#1"
+    material = material.replace(/number\s+1/i, '#1');
+    material = material.replace(/number\s+one/i, '#1');
+    material = material.replace(/number\s+2/i, '#2');
+    material = material.replace(/number\s+two/i, '#2');
+
     // First, search for pricing information
-    const { data: pricingData, error: pricingError } = await supabase
+    const { data: pricingData } = await supabase
       .from('material_pricing')
       .select('*')
       .ilike('question', `%${material}%`)
@@ -44,8 +51,8 @@ export default async function handler(req, res) {
       });
     }
 
-    // If no pricing found, search the knowledge base
-    const { data: knowledgeData, error: knowledgeError } = await supabase
+    // If no pricing found, search the knowledge base (with underscore!)
+    const { data: knowledgeData } = await supabase
       .from('recycle_knowledge')
       .select('*')
       .ilike('question', `%${material}%`)
@@ -61,7 +68,24 @@ export default async function handler(req, res) {
       });
     }
 
-    // If nothing found in either table
+    // If nothing found, search recycling materials FAQ (with underscore!)
+    const { data: materialsData } = await supabase
+      .from('recycling_materials')
+      .select('*')
+      .ilike('question', `%${material}%`)
+      .limit(1);
+
+    // If we found materials FAQ data, return it
+    if (materialsData && materialsData.length > 0) {
+      const response = materialsData[0].answer_voice || materialsData[0].answer_long || materialsData[0].answer;
+      return res.status(200).json({ 
+        success: true,
+        result: response,
+        data: materialsData[0]
+      });
+    }
+
+    // If nothing found in any table
     return res.status(404).json({ 
       success: false, 
       message: `I don't have information about ${material}. Please call our team at 406-543-1905.`,
