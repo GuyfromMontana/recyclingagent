@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     const { data, error } = await supabase
       .from('material_pricing')
       .select('*')
-      .ilike('name', `%${material}%`)
+      .ilike('question', `%${material}%`)
       .limit(1)
       .single();
 
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     }
 
     // Format the response for Vapi
-    const response = `We pay $${data.price} per pound for ${data.name}. ${data.notes || ''}`.trim();
+    const response = '${data.answer}`.trim();
 
     return res.status(200).json({ 
       success: true,
