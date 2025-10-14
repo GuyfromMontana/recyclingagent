@@ -89,7 +89,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// VAPI PRICING SEARCH ENDPOINT (Public - for voice agent)
+// VAPI PRICING SEARCH ENDPOINT - GET (Public - for voice agent)
 app.get('/api/vapi/search-pricing', async (req, res) => {
   try {
     const searchTerm = req.query.material || '';
@@ -131,6 +131,65 @@ app.get('/api/vapi/search-pricing', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: "Error retrieving pricing information" 
+    });
+  }
+});
+
+// VAPI PRICING SEARCH ENDPOINT - POST (for Vapi tool-calls webhook)
+app.post('/api/vapi/search-pricing', async (req, res) => {
+  try {
+    console.log('Received POST request:', JSON.stringify(req.body, null, 2));
+    
+    // Extract material from Vapi request body
+    const material = req.body.message?.toolCallList?.[0]?.function?.arguments?.material 
+                  || req.body.material 
+                  || '';
+    
+    if (!material) {
+      return res.json({ 
+        results: [{
+          success: false, 
+          message: "Please specify a material to search for"
+        }]
+      });
+    }
+
+    const { data, error } = await supabase
+      .from('material_pricing')
+      .select('*')
+      .ilike('question', `%${material}%`)
+      .eq('active', true)
+      .order('priority', { ascending: false })
+      .limit(1);
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      return res.json({
+        results: [{
+          toolCallId: req.body.message?.toolCallList?.[0]?.id,
+          result: `I don't have pricing information for ${material}. Our staff can give you a quote if you bring it in.`
+        }]
+      });
+    }
+
+    const materialData = data[0];
+    
+    // Return in format Vapi expects
+    return res.json({
+      results: [{
+        toolCallId: req.body.message?.toolCallList?.[0]?.id,
+        result: materialData.answer_voice || materialData.answer_long
+      }]
+    });
+
+  } catch (error) {
+    console.error('Error in POST search-pricing:', error);
+    res.status(500).json({ 
+      results: [{
+        success: false, 
+        message: "Error retrieving pricing information" 
+      }]
     });
   }
 });
