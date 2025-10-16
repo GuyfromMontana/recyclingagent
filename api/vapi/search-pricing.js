@@ -28,64 +28,75 @@ export default async function handler(req, res) {
     }
 
     // Normalize the search term to help with variations
-    // Convert "number 1" or "number one" to "#1"
     material = material.replace(/number\s+1/i, '#1');
     material = material.replace(/number\s+one/i, '#1');
     material = material.replace(/number\s+2/i, '#2');
     material = material.replace(/number\s+two/i, '#2');
 
-    // First, search for pricing information
+    // STEP 1: Search material_pricing table for questions
     const { data: pricingData } = await supabase
       .from('material_pricing')
       .select('*')
       .ilike('question', `%${material}%`)
       .limit(1);
 
-    // If we found pricing data, return it
     if (pricingData && pricingData.length > 0) {
-      const response = pricingData[0].answer_voice || pricingData[0].answer_long || pricingData[0].answer;
+      const response = pricingData[0].answer_voice || pricingData[0].answer_long;
       return res.status(200).json({ 
         success: true,
         result: response,
-        data: pricingData[0]
+        data: pricingData[0],
+        source: 'material_pricing'
       });
     }
 
-    // If no pricing found, search the knowledge base (with underscore!)
+    // STEP 2: Search recycle_knowledge table for questions
     const { data: knowledgeData } = await supabase
       .from('recycle_knowledge')
       .select('*')
       .ilike('question', `%${material}%`)
       .limit(1);
 
-    // If we found knowledge base data, return it
     if (knowledgeData && knowledgeData.length > 0) {
-      const response = knowledgeData[0].answer_voice || knowledgeData[0].answer_long || knowledgeData[0].answer;
+      const response = knowledgeData[0].answer_voice || knowledgeData[0].answer_long;
       return res.status(200).json({ 
         success: true,
         result: response,
-        data: knowledgeData[0]
+        data: knowledgeData[0],
+        source: 'recycle_knowledge'
       });
     }
 
-    // If nothing found, search recycling materials FAQ (with underscore!)
+    // STEP 3: Search recycling_materials by material_name (not question!)
     const { data: materialsData } = await supabase
       .from('recycling_materials')
       .select('*')
-      .ilike('question', `%${material}%`)
+      .or(`material_name.ilike.%${material}%,description.ilike.%${material}%`)
+      .eq('is_active', true)
       .limit(1);
 
-    // If we found materials FAQ data, return it
     if (materialsData && materialsData.length > 0) {
-      const response = materialsData[0].answer_voice || materialsData[0].answer_long || materialsData[0].answer;
+      const mat = materialsData[0];
+      // Build a response from the material data
+      let response = `${mat.material_name}`;
+      
+      if (mat.current_price) {
+        response += ` is currently priced at $${mat.current_price} per ${mat.price_unit || 'unit'}`;
+      }
+      
+      if (mat.description) {
+        response += `. ${mat.description}`;
+      }
+
       return res.status(200).json({ 
         success: true,
         result: response,
-        data: materialsData[0]
+        data: mat,
+        source: 'recycling_materials'
       });
     }
 
-    // If nothing found in any table
+    // STEP 4: Nothing found in any table
     return res.status(404).json({ 
       success: false, 
       message: `I don't have information about ${material}. Please call our team at 406-543-1905.`,
@@ -97,7 +108,8 @@ export default async function handler(req, res) {
     return res.status(500).json({ 
       success: false, 
       message: 'An error occurred. Please call 406-543-1905.',
-      result: 'An error occurred. Please call 406-543-1905.'
+      result: 'An error occurred. Please call 406-543-1905.',
+      error: error.message
     });
   }
 }
