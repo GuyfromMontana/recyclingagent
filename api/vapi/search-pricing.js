@@ -40,6 +40,7 @@ export default async function handler(req, res) {
     
     // CRITICAL FIX: Handle Vapi's deeply nested data format
     let material;
+    let toolCallId;
     
     console.log('📋 Checking fields:');
     
@@ -47,7 +48,9 @@ export default async function handler(req, res) {
     // req.body.message.toolCalls[0].function.arguments.material
     if (req.body?.message?.toolCalls?.[0]?.function?.arguments?.material) {
       material = req.body.message.toolCalls[0].function.arguments.material;
+      toolCallId = req.body.message.toolCalls[0].id; // EXTRACT THE TOOL CALL ID!
       console.log('  ✅ Found in message.toolCalls[0].function.arguments.material:', material);
+      console.log('  ✅ Tool Call ID:', toolCallId);
     }
     
     // Fallback: check if arguments is a JSON string
@@ -117,9 +120,14 @@ export default async function handler(req, res) {
       console.log('  recycling_materials rows:', allMaterials?.length || 0);
       
       const testResponse = `Test mode: Found ${allPricing?.length || 0} pricing rows, ${allKnowledge?.length || 0} knowledge rows, and ${allMaterials?.length || 0} material rows. Check Vercel logs for details.`;
-      console.log('  🚀 Sending test mode plain text response');
-      res.setHeader('Content-Type', 'text/plain');
-      return res.status(200).send(testResponse);
+      const response = {
+        results: [{
+          toolCallId: toolCallId,
+          result: testResponse
+        }]
+      };
+      console.log('  🚀 Sending test mode Vapi-formatted response');
+      return res.status(200).json(response);
     }
 
     // Normalize and prepare search terms
@@ -148,10 +156,14 @@ export default async function handler(req, res) {
     if (exactPricing?.length > 0) {
       console.log('  ✅ FOUND in strategy 1');
       console.log('  Answer:', exactPricing[0].answer_voice);
-      const answer = exactPricing[0].answer_voice;
-      console.log('  🚀 Sending plain text response:', answer);
-      res.setHeader('Content-Type', 'text/plain');
-      return res.status(200).send(answer);
+      const response = {
+        results: [{
+          toolCallId: toolCallId,
+          result: exactPricing[0].answer_voice
+        }]
+      };
+      console.log('  🚀 Sending Vapi-formatted response:', JSON.stringify(response));
+      return res.status(200).json(response);
     }
     console.log('  ⚠️ No results in strategy 1');
 
@@ -169,10 +181,14 @@ export default async function handler(req, res) {
     if (exactKnowledge?.length > 0) {
       console.log('  ✅ FOUND in strategy 2');
       console.log('  Answer:', exactKnowledge[0].answer_voice);
-      const answer = exactKnowledge[0].answer_voice;
-      console.log('  🚀 Sending plain text response:', answer);
-      res.setHeader('Content-Type', 'text/plain');
-      return res.status(200).send(answer);
+      const response = {
+        results: [{
+          toolCallId: toolCallId,
+          result: exactKnowledge[0].answer_voice
+        }]
+      };
+      console.log('  🚀 Sending Vapi-formatted response:', JSON.stringify(response));
+      return res.status(200).json(response);
     }
     console.log('  ⚠️ No results in strategy 2');
 
@@ -195,10 +211,14 @@ export default async function handler(req, res) {
       if (keywordPricing?.length > 0) {
         console.log('  ✅ FOUND in strategy 3');
         console.log('  Answer:', keywordPricing[0].answer_voice);
-        const answer = keywordPricing[0].answer_voice;
-        console.log('  🚀 Sending plain text response:', answer);
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send(answer);
+        const response = {
+          results: [{
+            toolCallId: toolCallId,
+            result: keywordPricing[0].answer_voice
+          }]
+        };
+        console.log('  🚀 Sending Vapi-formatted response:', JSON.stringify(response));
+        return res.status(200).json(response);
       }
       console.log('  ⚠️ No results in strategy 3');
     }
@@ -222,10 +242,14 @@ export default async function handler(req, res) {
       if (keywordKnowledge?.length > 0) {
         console.log('  ✅ FOUND in strategy 4');
         console.log('  Answer:', keywordKnowledge[0].answer_voice);
-        const answer = keywordKnowledge[0].answer_voice;
-        console.log('  🚀 Sending plain text response:', answer);
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send(answer);
+        const response = {
+          results: [{
+            toolCallId: toolCallId,
+            result: keywordKnowledge[0].answer_voice
+          }]
+        };
+        console.log('  🚀 Sending Vapi-formatted response:', JSON.stringify(response));
+        return res.status(200).json(response);
       }
       console.log('  ⚠️ No results in strategy 4');
     }
@@ -245,10 +269,14 @@ export default async function handler(req, res) {
       if (normalizedData?.length > 0) {
         console.log('  ✅ FOUND in strategy 5');
         console.log('  Answer:', normalizedData[0].answer_voice);
-        const answer = normalizedData[0].answer_voice;
-        console.log('  🚀 Sending plain text response:', answer);
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send(answer);
+        const response = {
+          results: [{
+            toolCallId: toolCallId,
+            result: normalizedData[0].answer_voice
+          }]
+        };
+        console.log('  🚀 Sending Vapi-formatted response:', JSON.stringify(response));
+        return res.status(200).json(response);
       }
       console.log('  ⚠️ No results in strategy 5');
     }
@@ -268,18 +296,28 @@ export default async function handler(req, res) {
       const material = materials[0];
       const answer = `Yes, we accept ${material.material_name}. The current price is ${material.current_price} per ${material.price_unit}.`;
       console.log('  Answer:', answer);
-      console.log('  🚀 Sending plain text response:', answer);
-      res.setHeader('Content-Type', 'text/plain');
-      return res.status(200).send(answer);
+      const response = {
+        results: [{
+          toolCallId: toolCallId,
+          result: answer
+        }]
+      };
+      console.log('  🚀 Sending Vapi-formatted response:', JSON.stringify(response));
+      return res.status(200).json(response);
     }
     console.log('  ⚠️ No results in strategy 6');
 
     // No results found
     console.log('❌ NO RESULTS FOUND in any strategy');
     const fallbackAnswer = "I don't have specific information about that. Please call us at 406-543-1905 and our team will be happy to help you.";
-    console.log('  🚀 Sending fallback plain text response:', fallbackAnswer);
-    res.setHeader('Content-Type', 'text/plain');
-    return res.status(200).send(fallbackAnswer);
+    const response = {
+      results: [{
+        toolCallId: toolCallId,
+        result: fallbackAnswer
+      }]
+    };
+    console.log('  🚀 Sending fallback Vapi-formatted response:', JSON.stringify(response));
+    return res.status(200).json(response);
 
   } catch (error) {
     console.error('💥 ERROR in try block:', error);
