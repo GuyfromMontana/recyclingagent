@@ -38,31 +38,38 @@ export default async function handler(req, res) {
   try {
     console.log('🚀 Starting main try block');
     
-    // CRITICAL FIX: Handle Vapi's data format
+    // CRITICAL FIX: Handle Vapi's deeply nested data format
     let material;
     
-    // Check if arguments is a JSON string (Vapi's format)
-    if (req.body?.arguments) {
-      console.log('📋 Found arguments field (Vapi format)');
-      console.log('📋 Arguments type:', typeof req.body.arguments);
-      
+    console.log('📋 Checking fields:');
+    
+    // Vapi sends data in a deeply nested structure:
+    // req.body.message.toolCalls[0].function.arguments.material
+    if (req.body?.message?.toolCalls?.[0]?.function?.arguments?.material) {
+      material = req.body.message.toolCalls[0].function.arguments.material;
+      console.log('  ✅ Found in message.toolCalls[0].function.arguments.material:', material);
+    }
+    
+    // Fallback: check if arguments is a JSON string
+    if (!material && req.body?.arguments) {
+      console.log('  📋 Checking arguments field');
       try {
-        // Parse the JSON string
         const parsedArgs = typeof req.body.arguments === 'string' 
           ? JSON.parse(req.body.arguments) 
           : req.body.arguments;
-        
-        console.log('📋 Parsed arguments:', parsedArgs);
         material = parsedArgs.material || parsedArgs.query || parsedArgs.question;
+        console.log('  ✅ Found in arguments:', material);
       } catch (parseError) {
-        console.log('❌ Failed to parse arguments:', parseError.message);
+        console.log('  ❌ Failed to parse arguments:', parseError.message);
       }
     }
     
-    // Fallback: check direct fields
+    // Fallback: direct field access
     if (!material) {
       material = req.body?.material || req.body?.query || req.body?.question;
-      console.log('📋 Using direct field access');
+      if (material) {
+        console.log('  ✅ Found in direct field:', material);
+      }
     }
     
     console.log('🎯 Final extracted material:', material);
