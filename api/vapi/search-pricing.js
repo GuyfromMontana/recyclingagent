@@ -117,25 +117,7 @@ export default async function handler(req, res) {
       console.log('  recycling_materials rows:', allMaterials?.length || 0);
       
       return res.status(200).json({
-        answer: `Test mode: Found ${allPricing?.length || 0} pricing rows, ${allKnowledge?.length || 0} knowledge rows, and ${allMaterials?.length || 0} material rows. Check Vercel logs for details.`,
-        test_mode: true,
-        tables: {
-          material_pricing: {
-            row_count: allPricing?.length || 0,
-            error: e1?.message || null,
-            sample_rows: allPricing || []
-          },
-          recycle_knowledge: {
-            row_count: allKnowledge?.length || 0,
-            error: e2?.message || null,
-            sample_rows: allKnowledge || []
-          },
-          recycling_materials: {
-            row_count: allMaterials?.length || 0,
-            error: e3?.message || null,
-            sample_rows: allMaterials || []
-          }
-        }
+        result: `Test mode: Found ${allPricing?.length || 0} pricing rows, ${allKnowledge?.length || 0} knowledge rows, and ${allMaterials?.length || 0} material rows. Check Vercel logs for details.`
       });
     }
 
@@ -166,9 +148,7 @@ export default async function handler(req, res) {
       console.log('  ✅ FOUND in strategy 1');
       console.log('  Answer:', exactPricing[0].answer_voice);
       return res.status(200).json({
-        answer: exactPricing[0].answer_voice,
-        source: 'material_pricing_exact',
-        confidence: 'high'
+        result: exactPricing[0].answer_voice
       });
     }
     console.log('  ⚠️ No results in strategy 1');
@@ -188,9 +168,7 @@ export default async function handler(req, res) {
       console.log('  ✅ FOUND in strategy 2');
       console.log('  Answer:', exactKnowledge[0].answer_voice);
       return res.status(200).json({
-        answer: exactKnowledge[0].answer_voice,
-        source: 'recycle_knowledge_exact',
-        confidence: 'high'
+        result: exactKnowledge[0].answer_voice
       });
     }
     console.log('  ⚠️ No results in strategy 2');
@@ -215,9 +193,7 @@ export default async function handler(req, res) {
         console.log('  ✅ FOUND in strategy 3');
         console.log('  Answer:', keywordPricing[0].answer_voice);
         return res.status(200).json({
-          answer: keywordPricing[0].answer_voice,
-          source: 'material_pricing_keyword',
-          confidence: 'medium'
+          result: keywordPricing[0].answer_voice
         });
       }
       console.log('  ⚠️ No results in strategy 3');
@@ -243,9 +219,7 @@ export default async function handler(req, res) {
         console.log('  ✅ FOUND in strategy 4');
         console.log('  Answer:', keywordKnowledge[0].answer_voice);
         return res.status(200).json({
-          answer: keywordKnowledge[0].answer_voice,
-          source: 'recycle_knowledge_keyword',
-          confidence: 'medium'
+          result: keywordKnowledge[0].answer_voice
         });
       }
       console.log('  ⚠️ No results in strategy 4');
@@ -267,9 +241,7 @@ export default async function handler(req, res) {
         console.log('  ✅ FOUND in strategy 5');
         console.log('  Answer:', normalizedData[0].answer_voice);
         return res.status(200).json({
-          answer: normalizedData[0].answer_voice,
-          source: 'recycle_knowledge_normalized',
-          confidence: 'medium'
+          result: normalizedData[0].answer_voice
         });
       }
       console.log('  ⚠️ No results in strategy 5');
@@ -291,9 +263,7 @@ export default async function handler(req, res) {
       const answer = `Yes, we accept ${material.material_name}. The current price is ${material.current_price} per ${material.price_unit}.`;
       console.log('  Answer:', answer);
       return res.status(200).json({
-        answer,
-        source: 'recycling_materials',
-        confidence: 'medium'
+        result: answer
       });
     }
     console.log('  ⚠️ No results in strategy 6');
@@ -301,9 +271,7 @@ export default async function handler(req, res) {
     // No results found
     console.log('❌ NO RESULTS FOUND in any strategy');
     return res.status(200).json({
-      answer: "I don't have specific information about that. Please call us at 406-543-1905 and our team will be happy to help you.",
-      source: 'fallback',
-      confidence: 'low'
+      result: "I don't have specific information about that. Please call us at 406-543-1905 and our team will be happy to help you."
     });
 
   } catch (error) {
