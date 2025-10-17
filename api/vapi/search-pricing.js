@@ -1,29 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 
 // ============================================
-// ENHANCED LOGGING VERSION
-// This will help us see what's happening
+// FIXED VERSION - Handles Vapi's data format
 // ============================================
 
 export default async function handler(req, res) {
-  // CHECKPOINT 1: Is the function even running?
   console.log('========================================');
   console.log('🔍 API FUNCTION STARTED');
   console.log('Time:', new Date().toISOString());
   console.log('========================================');
 
-  // CHECKPOINT 2: What method is being used?
   console.log('📨 Request Method:', req.method);
-  
-  // CHECKPOINT 3: What's in the request body?
   console.log('📦 Request Body (raw):', JSON.stringify(req.body, null, 2));
-  console.log('📦 Request Body Type:', typeof req.body);
   
-  // CHECKPOINT 4: Are environment variables loaded?
   console.log('🔐 Environment Check:');
   console.log('  - SUPABASE_URL exists:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
   console.log('  - SUPABASE_KEY exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-  console.log('  - URL starts with:', process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 20) + '...');
 
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -35,7 +27,6 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // Only allow POST requests
   if (req.method !== 'POST') {
     console.log('❌ Wrong method - expected POST, got:', req.method);
     return res.status(405).json({ 
@@ -47,22 +38,46 @@ export default async function handler(req, res) {
   try {
     console.log('🚀 Starting main try block');
     
-    // CHECKPOINT 5: Extract the material query
-    const material = req.body?.material || req.body?.query || req.body?.question;
-    console.log('🎯 Extracted material query:', material);
-    console.log('🎯 Material type:', typeof material);
+    // CRITICAL FIX: Handle Vapi's data format
+    let material;
+    
+    // Check if arguments is a JSON string (Vapi's format)
+    if (req.body?.arguments) {
+      console.log('📋 Found arguments field (Vapi format)');
+      console.log('📋 Arguments type:', typeof req.body.arguments);
+      
+      try {
+        // Parse the JSON string
+        const parsedArgs = typeof req.body.arguments === 'string' 
+          ? JSON.parse(req.body.arguments) 
+          : req.body.arguments;
+        
+        console.log('📋 Parsed arguments:', parsedArgs);
+        material = parsedArgs.material || parsedArgs.query || parsedArgs.question;
+      } catch (parseError) {
+        console.log('❌ Failed to parse arguments:', parseError.message);
+      }
+    }
+    
+    // Fallback: check direct fields
+    if (!material) {
+      material = req.body?.material || req.body?.query || req.body?.question;
+      console.log('📋 Using direct field access');
+    }
+    
+    console.log('🎯 Final extracted material:', material);
     
     if (!material) {
       console.log('❌ No material found in request');
       console.log('   Body keys available:', Object.keys(req.body || {}));
       return res.status(400).json({ 
         error: 'No query provided',
-        hint: 'Send a POST request with material, query, or question field',
+        hint: 'Send material, query, or question field',
         received_body: req.body
       });
     }
 
-    // CHECKPOINT 6: Initialize Supabase
+    // Initialize Supabase
     console.log('🔌 Initializing Supabase client...');
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -80,7 +95,6 @@ export default async function handler(req, res) {
     const normalized = normalizeQuestion(query);
     console.log('🔄 Normalized question:', normalized);
 
-    // CHECKPOINT 7: Starting database searches
     console.log('🔍 Starting database searches...');
 
     // Strategy 1: Exact match in material_pricing
