@@ -19,6 +19,10 @@
       "dest": "/api/vapi/search-pricing.js"
     },
     {
+      "src": "/api/vapi/save-message",
+      "dest": "/api/vapi/save-message.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/dist/$1"
     }
