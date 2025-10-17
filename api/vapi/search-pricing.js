@@ -92,6 +92,53 @@ export default async function handler(req, res) {
     );
     console.log('✅ Supabase client created');
 
+    // SPECIAL TEST MODE - if material is "TEST_DATABASE", show all data
+    if (material.toUpperCase() === 'TEST_DATABASE' || material.toUpperCase().includes('TEST')) {
+      console.log('🧪 TEST MODE ACTIVATED - Fetching all database data...');
+      
+      const { data: allPricing, error: e1 } = await supabase
+        .from('material_pricing')
+        .select('*')
+        .limit(5);
+      
+      const { data: allKnowledge, error: e2 } = await supabase
+        .from('recycle_knowledge')
+        .select('*')
+        .limit(5);
+      
+      const { data: allMaterials, error: e3 } = await supabase
+        .from('recycling_materials')
+        .select('*')
+        .limit(5);
+      
+      console.log('📊 Database Test Results:');
+      console.log('  material_pricing rows:', allPricing?.length || 0);
+      console.log('  recycle_knowledge rows:', allKnowledge?.length || 0);
+      console.log('  recycling_materials rows:', allMaterials?.length || 0);
+      
+      return res.status(200).json({
+        answer: `Test mode: Found ${allPricing?.length || 0} pricing rows, ${allKnowledge?.length || 0} knowledge rows, and ${allMaterials?.length || 0} material rows. Check Vercel logs for details.`,
+        test_mode: true,
+        tables: {
+          material_pricing: {
+            row_count: allPricing?.length || 0,
+            error: e1?.message || null,
+            sample_rows: allPricing || []
+          },
+          recycle_knowledge: {
+            row_count: allKnowledge?.length || 0,
+            error: e2?.message || null,
+            sample_rows: allKnowledge || []
+          },
+          recycling_materials: {
+            row_count: allMaterials?.length || 0,
+            error: e3?.message || null,
+            sample_rows: allMaterials || []
+          }
+        }
+      });
+    }
+
     // Normalize and prepare search terms
     const query = material.toLowerCase().trim();
     console.log('📝 Normalized query:', query);
