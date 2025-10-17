@@ -1,224 +1,272 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
-// Helper function to extract important keywords
-function extractKeywords(text) {
-  // Common words to ignore
-  const stopWords = ['is', 'are', 'the', 'a', 'an', 'you', 'your', 'do', 'does', 
-                     'can', 'could', 'would', 'should', 'there', 'anything', 'something',
-                     'i', 'me', 'my', 'we', 'us', 'what', 'how', 'when', 'where', 'why',
-                     'have', 'has', 'had', 'for', 'of', 'to', 'in', 'on', 'at', 'that'];
-  
-  // Split into words and filter
-  const words = text.toLowerCase()
-    .replace(/[^\w\s]/g, ' ') // Remove punctuation
-    .split(/\s+/)
-    .filter(word => word.length > 2 && !stopWords.includes(word));
-  
-  return words.join(' ');
-}
-
-// Helper function to normalize negative phrases
-function normalizeQuestion(text) {
-  let normalized = text.toLowerCase();
-  
-  // Normalize negative phrases
-  normalized = normalized.replace(/don't|dont|do not/g, 'not');
-  normalized = normalized.replace(/can't|cant|cannot/g, 'not');
-  normalized = normalized.replace(/won't|wont|will not/g, 'not');
-  normalized = normalized.replace(/isn't|isnt|is not/g, 'not');
-  
-  // Normalize common variations
-  normalized = normalized.replace(/accept/g, 'take');
-  normalized = normalized.replace(/business hours|open hours|hours of operation/g, 'hours');
-  normalized = normalized.replace(/location|address|where.*located/g, 'located');
-  normalized = normalized.replace(/phone.*number|contact.*number/g, 'phone');
-  
-  return normalized;
-}
+// ============================================
+// ENHANCED LOGGING VERSION
+// This will help us see what's happening
+// ============================================
 
 export default async function handler(req, res) {
-  // Only accept POST requests
+  // CHECKPOINT 1: Is the function even running?
+  console.log('========================================');
+  console.log('🔍 API FUNCTION STARTED');
+  console.log('Time:', new Date().toISOString());
+  console.log('========================================');
+
+  // CHECKPOINT 2: What method is being used?
+  console.log('📨 Request Method:', req.method);
+  
+  // CHECKPOINT 3: What's in the request body?
+  console.log('📦 Request Body (raw):', JSON.stringify(req.body, null, 2));
+  console.log('📦 Request Body Type:', typeof req.body);
+  
+  // CHECKPOINT 4: Are environment variables loaded?
+  console.log('🔐 Environment Check:');
+  console.log('  - SUPABASE_URL exists:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+  console.log('  - SUPABASE_KEY exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  console.log('  - URL starts with:', process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 20) + '...');
+
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    console.log('✅ OPTIONS request - sending 200');
+    return res.status(200).end();
+  }
+
+  // Only allow POST requests
   if (req.method !== 'POST') {
+    console.log('❌ Wrong method - expected POST, got:', req.method);
     return res.status(405).json({ 
-      success: false, 
-      message: 'Method not allowed. Use POST.' 
+      error: 'Method not allowed',
+      received_method: req.method
     });
   }
 
   try {
-    // Get the material from the request body
-    let { material } = req.body;
-
-    // Check if material was provided
+    console.log('🚀 Starting main try block');
+    
+    // CHECKPOINT 5: Extract the material query
+    const material = req.body?.material || req.body?.query || req.body?.question;
+    console.log('🎯 Extracted material query:', material);
+    console.log('🎯 Material type:', typeof material);
+    
     if (!material) {
+      console.log('❌ No material found in request');
+      console.log('   Body keys available:', Object.keys(req.body || {}));
       return res.status(400).json({ 
-        success: false, 
-        message: 'Please specify a material to search for' 
+        error: 'No query provided',
+        hint: 'Send a POST request with material, query, or question field',
+        received_body: req.body
       });
     }
 
-    // Normalize the search term
-    material = material.replace(/number\s+1/i, '#1');
-    material = material.replace(/number\s+one/i, '#1');
-    material = material.replace(/number\s+2/i, '#2');
-    material = material.replace(/number\s+two/i, '#2');
+    // CHECKPOINT 6: Initialize Supabase
+    console.log('🔌 Initializing Supabase client...');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+    console.log('✅ Supabase client created');
 
-    // Extract keywords for better searching
-    const keywords = extractKeywords(material);
-    const normalized = normalizeQuestion(material);
+    // Normalize and prepare search terms
+    const query = material.toLowerCase().trim();
+    console.log('📝 Normalized query:', query);
+    
+    const keywords = extractKeywords(query);
+    console.log('🔑 Extracted keywords:', keywords);
+    
+    const normalized = normalizeQuestion(query);
+    console.log('🔄 Normalized question:', normalized);
 
-    console.log('Original query:', material);
-    console.log('Keywords:', keywords);
-    console.log('Normalized:', normalized);
+    // CHECKPOINT 7: Starting database searches
+    console.log('🔍 Starting database searches...');
 
-    // STRATEGY 1: Try exact question match first (most accurate)
-    const { data: exactMatch } = await supabase
+    // Strategy 1: Exact match in material_pricing
+    console.log('  Strategy 1: Exact match in material_pricing');
+    const { data: exactPricing, error: error1 } = await supabase
       .from('material_pricing')
       .select('*')
-      .ilike('question', `%${material}%`)
-      .limit(1);
-
-    if (exactMatch && exactMatch.length > 0) {
-      const response = exactMatch[0].answer_voice || exactMatch[0].answer_long;
-      return res.status(200).json({ 
-        success: true,
-        result: response,
-        data: exactMatch[0],
-        source: 'material_pricing',
-        match_type: 'exact'
-      });
-    }
-
-    // STRATEGY 2: Search knowledge base with exact match
-    const { data: exactKnowledge } = await supabase
-      .from('recycle_knowledge')
-      .select('*')
-      .ilike('question', `%${material}%`)
-      .eq('is_active', true)
-      .limit(1);
-
-    if (exactKnowledge && exactKnowledge.length > 0) {
-      const response = exactKnowledge[0].answer_voice || exactKnowledge[0].answer_long;
-      return res.status(200).json({ 
-        success: true,
-        result: response,
-        data: exactKnowledge[0],
-        source: 'recycle_knowledge',
-        match_type: 'exact'
-      });
-    }
-
-    // STRATEGY 3: Search with keywords across multiple fields (pricing)
-    const { data: keywordPricing } = await supabase
-      .from('material_pricing')
-      .select('*')
-      .or(`question.ilike.%${keywords}%,answer_voice.ilike.%${keywords}%,category.ilike.%${keywords}%`)
+      .or(`question.ilike.%${query}%,intent.ilike.%${query}%`)
       .eq('active', true)
       .order('priority', { ascending: false })
       .limit(1);
 
-    if (keywordPricing && keywordPricing.length > 0) {
-      const response = keywordPricing[0].answer_voice || keywordPricing[0].answer_long;
-      return res.status(200).json({ 
-        success: true,
-        result: response,
-        data: keywordPricing[0],
-        source: 'material_pricing',
-        match_type: 'keyword'
+    if (error1) console.log('  ❌ Error in strategy 1:', error1.message);
+    if (exactPricing?.length > 0) {
+      console.log('  ✅ FOUND in strategy 1');
+      console.log('  Answer:', exactPricing[0].answer_voice);
+      return res.status(200).json({
+        answer: exactPricing[0].answer_voice,
+        source: 'material_pricing_exact',
+        confidence: 'high'
       });
     }
+    console.log('  ⚠️ No results in strategy 1');
 
-    // STRATEGY 4: Search knowledge base with keywords
-    const { data: keywordKnowledge } = await supabase
+    // Strategy 2: Exact match in recycle_knowledge
+    console.log('  Strategy 2: Exact match in recycle_knowledge');
+    const { data: exactKnowledge, error: error2 } = await supabase
       .from('recycle_knowledge')
       .select('*')
-      .or(`question.ilike.%${keywords}%,answer_voice.ilike.%${keywords}%,category.ilike.%${keywords}%`)
+      .or(`question.ilike.%${query}%,intent.ilike.%${query}%`)
       .eq('is_active', true)
       .order('priority', { ascending: false })
       .limit(1);
 
-    if (keywordKnowledge && keywordKnowledge.length > 0) {
-      const response = keywordKnowledge[0].answer_voice || keywordKnowledge[0].answer_long;
-      return res.status(200).json({ 
-        success: true,
-        result: response,
-        data: keywordKnowledge[0],
-        source: 'recycle_knowledge',
-        match_type: 'keyword'
+    if (error2) console.log('  ❌ Error in strategy 2:', error2.message);
+    if (exactKnowledge?.length > 0) {
+      console.log('  ✅ FOUND in strategy 2');
+      console.log('  Answer:', exactKnowledge[0].answer_voice);
+      return res.status(200).json({
+        answer: exactKnowledge[0].answer_voice,
+        source: 'recycle_knowledge_exact',
+        confidence: 'high'
       });
     }
+    console.log('  ⚠️ No results in strategy 2');
 
-    // STRATEGY 5: Try normalized search (handles "don't take" vs "can't take")
-    const { data: normalizedData } = await supabase
-      .from('recycle_knowledge')
-      .select('*')
-      .or(`question.ilike.%${normalized}%,answer_voice.ilike.%${normalized}%`)
-      .eq('is_active', true)
-      .limit(1);
+    // Strategy 3: Keyword search in material_pricing
+    if (keywords.length > 0) {
+      console.log('  Strategy 3: Keyword search in material_pricing');
+      const keywordConditions = keywords.map(k => 
+        `question.ilike.%${k}%,answer_voice.ilike.%${k}%,intent.ilike.%${k}%`
+      ).join(',');
+      
+      const { data: keywordPricing, error: error3 } = await supabase
+        .from('material_pricing')
+        .select('*')
+        .or(keywordConditions)
+        .eq('active', true)
+        .order('priority', { ascending: false })
+        .limit(1);
 
-    if (normalizedData && normalizedData.length > 0) {
-      const response = normalizedData[0].answer_voice || normalizedData[0].answer_long;
-      return res.status(200).json({ 
-        success: true,
-        result: response,
-        data: normalizedData[0],
-        source: 'recycle_knowledge',
-        match_type: 'normalized'
-      });
+      if (error3) console.log('  ❌ Error in strategy 3:', error3.message);
+      if (keywordPricing?.length > 0) {
+        console.log('  ✅ FOUND in strategy 3');
+        console.log('  Answer:', keywordPricing[0].answer_voice);
+        return res.status(200).json({
+          answer: keywordPricing[0].answer_voice,
+          source: 'material_pricing_keyword',
+          confidence: 'medium'
+        });
+      }
+      console.log('  ⚠️ No results in strategy 3');
     }
 
-    // STRATEGY 6: Search recycling_materials by material name
-    const { data: materialsData } = await supabase
+    // Strategy 4: Keyword search in recycle_knowledge
+    if (keywords.length > 0) {
+      console.log('  Strategy 4: Keyword search in recycle_knowledge');
+      const keywordConditions = keywords.map(k => 
+        `question.ilike.%${k}%,answer_voice.ilike.%${k}%,intent.ilike.%${k}%`
+      ).join(',');
+      
+      const { data: keywordKnowledge, error: error4 } = await supabase
+        .from('recycle_knowledge')
+        .select('*')
+        .or(keywordConditions)
+        .eq('is_active', true)
+        .order('priority', { ascending: false })
+        .limit(1);
+
+      if (error4) console.log('  ❌ Error in strategy 4:', error4.message);
+      if (keywordKnowledge?.length > 0) {
+        console.log('  ✅ FOUND in strategy 4');
+        console.log('  Answer:', keywordKnowledge[0].answer_voice);
+        return res.status(200).json({
+          answer: keywordKnowledge[0].answer_voice,
+          source: 'recycle_knowledge_keyword',
+          confidence: 'medium'
+        });
+      }
+      console.log('  ⚠️ No results in strategy 4');
+    }
+
+    // Strategy 5: Normalized question search
+    if (normalized !== query) {
+      console.log('  Strategy 5: Normalized search');
+      const { data: normalizedData, error: error5 } = await supabase
+        .from('recycle_knowledge')
+        .select('*')
+        .or(`question.ilike.%${normalized}%,answer_voice.ilike.%${normalized}%`)
+        .eq('is_active', true)
+        .order('priority', { ascending: false })
+        .limit(1);
+
+      if (error5) console.log('  ❌ Error in strategy 5:', error5.message);
+      if (normalizedData?.length > 0) {
+        console.log('  ✅ FOUND in strategy 5');
+        console.log('  Answer:', normalizedData[0].answer_voice);
+        return res.status(200).json({
+          answer: normalizedData[0].answer_voice,
+          source: 'recycle_knowledge_normalized',
+          confidence: 'medium'
+        });
+      }
+      console.log('  ⚠️ No results in strategy 5');
+    }
+
+    // Strategy 6: Check material catalog
+    console.log('  Strategy 6: Material catalog search');
+    const { data: materials, error: error6 } = await supabase
       .from('recycling_materials')
       .select('*')
-      .or(`material_name.ilike.%${material}%,description.ilike.%${keywords}%,category.ilike.%${keywords}%`)
-      .eq('is_active', true)
+      .or(`material_name.ilike.%${query}%,description.ilike.%${query}%`)
+      .eq('price_status', 'active')
       .limit(1);
 
-    if (materialsData && materialsData.length > 0) {
-      const mat = materialsData[0];
-      let response = `${mat.material_name}`;
-      
-      if (mat.current_price) {
-        response += ` is currently priced at $${mat.current_price} per ${mat.price_unit || 'unit'}`;
-      } else {
-        response += ` - please call us for current pricing`;
-      }
-      
-      if (mat.description) {
-        response += `. ${mat.description}`;
-      }
-
-      return res.status(200).json({ 
-        success: true,
-        result: response,
-        data: mat,
+    if (error6) console.log('  ❌ Error in strategy 6:', error6.message);
+    if (materials?.length > 0) {
+      console.log('  ✅ FOUND in strategy 6');
+      const material = materials[0];
+      const answer = `Yes, we accept ${material.material_name}. The current price is ${material.current_price} per ${material.price_unit}.`;
+      console.log('  Answer:', answer);
+      return res.status(200).json({
+        answer,
         source: 'recycling_materials',
-        match_type: 'material'
+        confidence: 'medium'
       });
     }
+    console.log('  ⚠️ No results in strategy 6');
 
-    // Nothing found after all strategies
-    return res.status(404).json({ 
-      success: false, 
-      message: `I don't have information about ${material}. Please call our team at 406-543-1905.`,
-      result: `I don't have information about ${material}. Please call our team at 406-543-1905.`
+    // No results found
+    console.log('❌ NO RESULTS FOUND in any strategy');
+    return res.status(200).json({
+      answer: "I don't have specific information about that. Please call us at 406-543-1905 and our team will be happy to help you.",
+      source: 'fallback',
+      confidence: 'low'
     });
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('💥 ERROR in try block:', error);
+    console.error('💥 Error message:', error.message);
+    console.error('💥 Error stack:', error.stack);
     return res.status(500).json({ 
-      success: false, 
-      message: 'An error occurred. Please call 406-543-1905.',
-      result: 'An error occurred. Please call 406-543-1905.',
-      error: error.message
+      error: 'Internal server error',
+      message: error.message,
+      type: error.name
     });
   }
+}
+
+// Helper function to extract keywords
+function extractKeywords(text) {
+  const stopWords = ['what', 'is', 'the', 'how', 'much', 'do', 'you', 'take', 'accept', 'can', 'i', 'we', 'does', 'are', 'for', 'of', 'a', 'an'];
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !stopWords.includes(word));
+}
+
+// Helper function to normalize questions
+function normalizeQuestion(text) {
+  return text
+    .replace(/don'?t\s+(take|accept)/gi, 'not take')
+    .replace(/can'?t\s+(take|accept)/gi, 'not take')
+    .replace(/won'?t\s+(take|accept)/gi, 'not take')
+    .replace(/do\s+not\s+(take|accept)/gi, 'not take')
+    .toLowerCase();
 }
 
