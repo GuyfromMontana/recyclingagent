@@ -1,9 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import { Resend } from 'resend';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const resendApiKey = process.env.RESEND_API_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export default async function handler(req, res) {
   // Only allow POST requests
@@ -13,7 +15,7 @@ export default async function handler(req, res) {
 
   try {
     console.log('📥 Received message request:', JSON.stringify(req.body));
-
+    
     // Extract the tool call from Vapi's request
     const toolCall = req.body.message?.toolCalls?.[0];
     
@@ -23,7 +25,6 @@ export default async function handler(req, res) {
     }
 
     const { customer_name, customer_phone, message } = toolCall.function.arguments;
-
     console.log('💾 Saving message:', { customer_name, customer_phone, message });
 
     // Save to database
@@ -48,38 +49,24 @@ export default async function handler(req, res) {
 
     // Send email notification
     try {
-      console.log('📧 Sending email notification...');
-      
-      const emailResponse = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${resendApiKey}`
-        },
-        body: JSON.stringify({
-          from: 'Axmen Recycling <onboarding@resend.dev>',
-          to: ['jake@axmen.com'],
-          subject: `New Customer Message from ${customer_name}`,
-          html: `
-            <h2>New Customer Message</h2>
-            <p><strong>From:</strong> ${customer_name}</p>
-            <p><strong>Phone:</strong> ${customer_phone}</p>
-            <p><strong>Message:</strong> ${message}</p>
-            <p><strong>Time:</strong> ${new Date().toLocaleString('en-US', { timeZone: 'America/Denver' })}</p>
-            <hr>
-            <p style="color: #666; font-size: 12px;">This message was received via the Axmen Recycling voice assistant.</p>
-          `
-        })
+      const emailResult = await resend.emails.send({
+        from: 'Axmen Recycling <onboarding@resend.dev>',
+        to: 'jake@axmen.com',
+        subject: `New Customer Message from ${customer_name || 'Unknown'}`,
+        html: `
+          <h2>New Customer Message</h2>
+          <p><strong>Customer Name:</strong> ${customer_name || 'Unknown'}</p>
+          <p><strong>Phone Number:</strong> ${customer_phone || 'Not provided'}</p>
+          <p><strong>Message:</strong></p>
+          <p>${message || 'No message provided'}</p>
+          <hr>
+          <p><em>This message was recorded by the Axmen Recycling voice assistant.</em></p>
+        `
       });
-
-      if (emailResponse.ok) {
-        console.log('✅ Email sent successfully');
-      } else {
-        const emailError = await emailResponse.text();
-        console.error('⚠️ Email failed:', emailError);
-      }
+      
+      console.log('✅ Email sent successfully:', emailResult);
     } catch (emailError) {
-      console.error('⚠️ Email error (non-critical):', emailError);
+      console.error('⚠️ Email error (but message was saved):', emailError);
       // Don't fail the whole request if email fails
     }
 
