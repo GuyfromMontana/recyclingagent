@@ -109,17 +109,11 @@ export default async function handler(req, res) {
         .select('*')
         .limit(5);
       
-      const { data: allMaterials, error: e3 } = await supabase
-        .from('recycling_materials')
-        .select('*')
-        .limit(5);
-      
       console.log('📊 Database Test Results:');
       console.log('  material_pricing rows:', allPricing?.length || 0);
       console.log('  recycle_knowledge rows:', allKnowledge?.length || 0);
-      console.log('  recycling_materials rows:', allMaterials?.length || 0);
       
-      const testResponse = `Test mode: Found ${allPricing?.length || 0} pricing rows, ${allKnowledge?.length || 0} knowledge rows, and ${allMaterials?.length || 0} material rows. Check Vercel logs for details.`;
+      const testResponse = `Test mode: Found ${allPricing?.length || 0} pricing rows and ${allKnowledge?.length || 0} knowledge rows. Check Vercel logs for details.`;
       const response = {
         results: [{
           toolCallId: toolCallId,
@@ -280,32 +274,6 @@ export default async function handler(req, res) {
       }
       console.log('  ⚠️ No results in strategy 5');
     }
-
-    // Strategy 6: Check material catalog
-    console.log('  Strategy 6: Material catalog search');
-    const { data: materials, error: error6 } = await supabase
-      .from('recycling_materials')
-      .select('*')
-      .or(`material_name.ilike.%${query}%,description.ilike.%${query}%`)
-      .eq('price_status', 'active')
-      .limit(1);
-
-    if (error6) console.log('  ❌ Error in strategy 6:', error6.message);
-    if (materials?.length > 0) {
-      console.log('  ✅ FOUND in strategy 6');
-      const material = materials[0];
-      const answer = `Yes, we accept ${material.material_name}. The current price is ${material.current_price} per ${material.price_unit}.`;
-      console.log('  Answer:', answer);
-      const response = {
-        results: [{
-          toolCallId: toolCallId,
-          result: answer
-        }]
-      };
-      console.log('  🚀 Sending Vapi-formatted response:', JSON.stringify(response));
-      return res.status(200).json(response);
-    }
-    console.log('  ⚠️ No results in strategy 6');
 
     // No results found
     console.log('❌ NO RESULTS FOUND in any strategy');
