@@ -115,7 +115,7 @@ export default async function handler(req, res) {
     // Call semantic search function
     console.log('🔍 Calling search_recycle_knowledge_semantic()...');
     const { data: searchResults, error: searchError } = await supabase
-      .rpc('search_recycle_knowledge_semantic', {
+     .rpc('search_knowledge_base_semantic', { 
         query_embedding: questionEmbedding,
         match_threshold: 0.5,  // Adjust this based on your testing
         match_count: 3         // Get top 3 matches
