@@ -1,0 +1,10 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+zep-cloud==2.0.0
+supabase==2.0.3
+python-multipart==0.0.6
+```
+
+   - Add `Procfile`:
+```
+web: uvicorn main:app --host 0.0.0.0 --port $PORT
