@@ -23,6 +23,10 @@
       "dest": "/api/vapi/save-message.js"
     },
     {
+      "src": "/api/vapi/save-callback",
+      "dest": "/api/vapi/save-callback.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/dist/$1"
     }
