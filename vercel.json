@@ -31,12 +31,15 @@
       "dest": "/api/vapi/get-caller-info.js"
     },
     {
+      "src": "/api/vapi/search-faqs",
+      "dest": "/api/vapi/search-faqs.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/dist/$1"
     }
   ]
 }
-
 
 
 
