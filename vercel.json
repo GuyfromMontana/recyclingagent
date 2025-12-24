@@ -27,6 +27,10 @@
       "dest": "/api/vapi/save-callback.js"
     },
     {
+      "src": "/api/vapi/get-caller-info",
+      "dest": "/api/vapi/get-caller-info.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/dist/$1"
     }
