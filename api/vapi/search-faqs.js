@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // ============================================
-// SIMPLIFIED FAQ SEARCH - Uses axmen_faqs table
+// SIMPLIFIED FAQ SEARCH - Uses recycle_knowledge table
 // No pricing info - redirects pricing questions to callback
 // ============================================
 
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
       const conditions = keywords.map(k => `question.ilike.%${k}%`).join(',');
       
       const { data, error } = await supabase
-        .from('axmen_faqs')
+        .from('recycle_knowledge')
         .select('*')
         .or(conditions)
         .eq('is_active', true)
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
         // Score results by keyword match count
         const scored = data.map(row => {
           let score = 0;
-          const rowText = (row.question + ' ' + (row.keywords?.join(' ') || '')).toLowerCase();
+          const rowText = (row.question + ' ' + (row.tags?.join(' ') || '')).toLowerCase();
           keywords.forEach(k => {
             if (rowText.includes(k)) score++;
           });
@@ -84,18 +84,18 @@ export default async function handler(req, res) {
       }
     }
 
-    // Strategy 2: Check keywords array if no match yet
+    // Strategy 2: Check tags array if no match yet
     if (!result && keywords.length > 0) {
       const { data, error } = await supabase
-        .from('axmen_faqs')
+        .from('recycle_knowledge')
         .select('*')
         .eq('is_active', true);
 
       if (!error && data) {
         for (const row of data) {
-          if (row.keywords && Array.isArray(row.keywords)) {
+          if (row.tags && Array.isArray(row.tags)) {
             const matchCount = keywords.filter(k => 
-              row.keywords.some(rk => rk.toLowerCase().includes(k) || k.includes(rk.toLowerCase()))
+              row.tags.some(rk => rk.toLowerCase().includes(k) || k.includes(rk.toLowerCase()))
             ).length;
             
             if (matchCount > 0) {
@@ -106,7 +106,7 @@ export default async function handler(req, res) {
           }
         }
         if (result) {
-          console.log('✅ Found via keywords array:', result.question);
+          console.log('✅ Found via tags array:', result.question);
         }
       }
     }
