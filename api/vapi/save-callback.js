@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 
@@ -12,7 +13,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Google Sheet webhook URL - UPDATE THIS with your deployed Apps Script URL
+// Google Sheet webhook URL
 const GOOGLE_SHEET_WEBHOOK = process.env.GOOGLE_SHEET_WEBHOOK || 'YOUR_APPS_SCRIPT_URL_HERE';
 
 export default async function handler(req, res) {
@@ -143,7 +144,6 @@ export default async function handler(req, res) {
       console.log('✅ Email sent:', emailResult);
     } catch (emailError) {
       console.error('⚠️ Email failed (callback still saved):', emailError);
-      // Don't fail the request if email fails
     }
 
     // Post to Google Sheet for callback queue tracking
@@ -156,7 +156,8 @@ export default async function handler(req, res) {
             timestamp: timestamp,
             name: caller_name || 'Not provided',
             phone: caller_phone,
-            askingAbout: material_description || 'Not specified'
+            askingAbout: material_description || '',
+            notes: notes || ''
           })
         });
         
@@ -170,7 +171,6 @@ export default async function handler(req, res) {
       }
     } catch (sheetError) {
       console.error('⚠️ Google Sheet failed (callback still saved):', sheetError);
-      // Don't fail the request if sheet update fails
     }
 
     // Format phone for voice response
@@ -197,17 +197,14 @@ export default async function handler(req, res) {
 function formatPhoneForVoice(phone) {
   if (!phone) return 'your number';
   
-  // Remove non-digits
   const digits = phone.replace(/\D/g, '');
   
-  // Handle 10 or 11 digit numbers
   let d = digits;
   if (digits.length === 11 && digits[0] === '1') {
     d = digits.slice(1);
   }
   
   if (d.length === 10) {
-    // Convert to voice format: "four o six, five five five, one two three four"
     return d.split('').map(digit => {
       const words = ['o', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
       return words[parseInt(digit)];
