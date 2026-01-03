@@ -4,12 +4,16 @@ import { Resend } from 'resend';
 // ============================================
 // SAVE CALLBACK - Saves to callback_requests table
 // Sends email notification to staff
+// Posts to Google Sheet for tracking
 // ============================================
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Google Sheet webhook URL - UPDATE THIS with your deployed Apps Script URL
+const GOOGLE_SHEET_WEBHOOK = process.env.GOOGLE_SHEET_WEBHOOK || 'YOUR_APPS_SCRIPT_URL_HERE';
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -77,6 +81,9 @@ export default async function handler(req, res) {
 
     console.log('✅ Callback saved:', data);
 
+    // Get formatted timestamp for notifications
+    const timestamp = new Date().toLocaleString('en-US', { timeZone: 'America/Denver' });
+
     // Send email notification
     try {
       const emailResult = await resend.emails.send({
@@ -114,7 +121,7 @@ export default async function handler(req, res) {
               ` : ''}
               <tr>
                 <td style="padding: 10px; background: #f8f9fa; font-weight: bold;">Time:</td>
-                <td style="padding: 10px; background: #f8f9fa;">${new Date().toLocaleString('en-US', { timeZone: 'America/Denver' })}</td>
+                <td style="padding: 10px; background: #f8f9fa;">${timestamp}</td>
               </tr>
             </table>
             
@@ -137,6 +144,33 @@ export default async function handler(req, res) {
     } catch (emailError) {
       console.error('⚠️ Email failed (callback still saved):', emailError);
       // Don't fail the request if email fails
+    }
+
+    // Post to Google Sheet for callback queue tracking
+    try {
+      if (GOOGLE_SHEET_WEBHOOK && GOOGLE_SHEET_WEBHOOK !== 'YOUR_APPS_SCRIPT_URL_HERE') {
+        const sheetResponse = await fetch(GOOGLE_SHEET_WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            timestamp: timestamp,
+            name: caller_name || 'Not provided',
+            phone: caller_phone,
+            askingAbout: material_description || 'Not specified'
+          })
+        });
+        
+        if (sheetResponse.ok) {
+          console.log('✅ Google Sheet updated');
+        } else {
+          console.error('⚠️ Google Sheet update failed:', await sheetResponse.text());
+        }
+      } else {
+        console.log('ℹ️ Google Sheet webhook not configured, skipping');
+      }
+    } catch (sheetError) {
+      console.error('⚠️ Google Sheet failed (callback still saved):', sheetError);
+      // Don't fail the request if sheet update fails
     }
 
     // Format phone for voice response
