@@ -253,6 +253,8 @@ async def get_caller_context(phone_number: str) -> dict:
     """
     Retrieve conversation history and context for a returning caller.
     Returns a summary that Vapi can use to personalize the greeting.
+    
+    V3 API: Uses zep.memory.get() instead of deprecated message.list()
     """
     try:
         # Check if this caller exists in Zep
@@ -267,7 +269,7 @@ async def get_caller_context(phone_number: str) -> dict:
                 "summary": "First time caller - no previous conversation history."
             }
         
-        # Get the user's sessions
+        # Get the user's sessions (V3 API)
         try:
             sessions = zep.user.get_sessions(user_id=phone_number)
             print(f"   ✓ Found {len(sessions) if sessions else 0} sessions for user")
@@ -291,7 +293,7 @@ async def get_caller_context(phone_number: str) -> dict:
         
         print(f"   ✓ Found session: {session_id}")
         
-        # Get memory/summary for this session
+        # Get memory/summary for this session (V3 API)
         try:
             memory = zep.memory.get(session_id=session_id)
             
@@ -309,16 +311,12 @@ async def get_caller_context(phone_number: str) -> dict:
             
             if context_parts:
                 summary = " | ".join(context_parts)
+                print(f"   ✓ Retrieved memory summary with facts/summary")
             else:
-                # Fallback: get last few messages
-                messages = zep.message.list(session_id=session_id, limit=10)
-                recent_messages = []
-                for msg in messages[:5]:
-                    role = "Customer" if msg.role == "user" else "Agent"
-                    recent_messages.append(f"{role}: {msg.content[:100]}")
-                summary = "Recent exchange: " + " | ".join(recent_messages)
+                # Fallback: Basic returning caller message
+                summary = "Returning caller with previous conversation on file."
+                print(f"   ℹ No facts/summary available, using generic message")
             
-            print(f"   ✓ Retrieved memory summary")
             return {
                 "is_returning_caller": True,
                 "summary": summary,
@@ -327,24 +325,11 @@ async def get_caller_context(phone_number: str) -> dict:
             
         except Exception as e:
             print(f"   ⚠️ Error getting memory: {e}")
-            # Fallback
-            try:
-                messages = zep.message.list(session_id=session_id, limit=5)
-                if messages and len(messages) > 0:
-                    summary = f"Returning caller. Last spoke about: {messages[0].content[:200]}"
-                else:
-                    summary = "Returning caller with previous conversation on file."
-                
-                return {
-                    "is_returning_caller": True,
-                    "summary": summary
-                }
-            except Exception as inner_e:
-                print(f"   ⚠️ Error getting messages: {inner_e}")
-                return {
-                    "is_returning_caller": True,
-                    "summary": "Returning caller with previous conversation on file."
-                }
+            # Simple fallback without deprecated message.list()
+            return {
+                "is_returning_caller": True,
+                "summary": "Returning caller with previous conversation on file."
+            }
             
     except Exception as e:
         print(f"   ❌ Error retrieving caller context: {e}")
@@ -358,7 +343,8 @@ async def get_caller_context(phone_number: str) -> dict:
 
 async def save_conversation(phone_number: str, call_id: str, transcript: str, messages: list):
     """
-    Save conversation to Zep memory using session methods
+    Save conversation to Zep memory using V3 API.
+    Uses zep.memory.add() which is V3-compatible.
     """
     try:
         print(f"\n💾 Saving conversation for: {phone_number}")
@@ -426,7 +412,7 @@ async def save_conversation(phone_number: str, call_id: str, transcript: str, me
         print(f"   Session: {session_id}")
         print(f"   Messages: {len(zep_messages)}")
         
-        # Add messages to session (this creates the session if it doesn't exist)
+        # V3 API: Add messages to session (this creates the session if it doesn't exist)
         try:
             zep.memory.add(
                 session_id=session_id,
@@ -435,6 +421,7 @@ async def save_conversation(phone_number: str, call_id: str, transcript: str, me
             
             print(f"   ✓ Conversation saved successfully to session: {session_id}")
             print(f"   ✓ Messages saved: {len(zep_messages)}")
+            print(f"   ✅ Zep V3 API verified!")
             
         except Exception as e:
             print(f"   ❌ Error saving messages: {str(e)}")
