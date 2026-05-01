@@ -4,7 +4,7 @@ import { Resend } from 'resend';
 
 // ============================================
 // SAVE CALLBACK - Saves to callback_requests table
-// Sends email notification to staff
+// Sends email + SMS notification to staff
 // Posts to Google Sheet for tracking
 // ============================================
 
@@ -15,6 +15,18 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Google Sheet webhook URL
 const GOOGLE_SHEET_WEBHOOK = process.env.GOOGLE_SHEET_WEBHOOK || 'YOUR_APPS_SCRIPT_URL_HERE';
+
+// Twilio SMS config — comma-separated E.164 numbers in SMS_RECIPIENTS.
+// Prefer a Messaging Service SID (MG...) so the A2P 10DLC campaign is
+// applied automatically; fall back to TWILIO_FROM_NUMBER if not set.
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_MESSAGING_SERVICE_SID = process.env.TWILIO_MESSAGING_SERVICE_SID;
+const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
+const SMS_RECIPIENTS = (process.env.SMS_RECIPIENTS || '')
+  .split(',')
+  .map(n => n.trim())
+  .filter(Boolean);
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -88,8 +100,8 @@ export default async function handler(req, res) {
     // Send email notification
     try {
       const emailResult = await resend.emails.send({
-        from: 'Axmen Recycling <onboarding@resend.dev>',
-        to: 'guy@axmen.com',
+        from: 'Axmen Recycling <callbacks@axmen.com>',
+        to: ['guy@axmen.com', 'caleb@axmenrecycling.com', 'jake@axmen.com'],
         subject: `📞 New Callback Request - ${caller_name || caller_phone}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -144,6 +156,52 @@ export default async function handler(req, res) {
       console.log('✅ Email sent:', emailResult);
     } catch (emailError) {
       console.error('⚠️ Email failed (callback still saved):', emailError);
+    }
+
+    // Send SMS notification via Twilio to staff
+    const twilioReady =
+      TWILIO_ACCOUNT_SID &&
+      TWILIO_AUTH_TOKEN &&
+      (TWILIO_MESSAGING_SERVICE_SID || TWILIO_FROM_NUMBER) &&
+      SMS_RECIPIENTS.length > 0;
+    if (twilioReady) {
+      // Carrier-required STOP language so live traffic matches the A2P
+      // campaign sample messages.
+      const smsBody = `New Axmen callback: ${caller_name || 'Unknown'} (${caller_phone}) — ${material_description || 'no detail'}\nReply STOP to unsubscribe.`;
+      const twilioAuth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
+      const smsResults = await Promise.allSettled(
+        SMS_RECIPIENTS.map(to => {
+          const params = new URLSearchParams({ To: to, Body: smsBody });
+          if (TWILIO_MESSAGING_SERVICE_SID) {
+            params.set('MessagingServiceSid', TWILIO_MESSAGING_SERVICE_SID);
+          } else {
+            params.set('From', TWILIO_FROM_NUMBER);
+          }
+          return fetch(
+            `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Basic ${twilioAuth}`,
+                'Content-Type': 'application/x-www-form-urlencoded'
+              },
+              body: params
+            }
+          ).then(async r => {
+            if (!r.ok) throw new Error(`Twilio ${r.status}: ${await r.text()}`);
+            return r.json();
+          });
+        })
+      );
+      smsResults.forEach((res, i) => {
+        if (res.status === 'fulfilled') {
+          console.log(`✅ SMS sent to ${SMS_RECIPIENTS[i]}`);
+        } else {
+          console.error(`⚠️ SMS to ${SMS_RECIPIENTS[i]} failed:`, res.reason?.message || res.reason);
+        }
+      });
+    } else {
+      console.log('ℹ️ Twilio SMS not configured, skipping');
     }
 
     // Post to Google Sheet for callback queue tracking
