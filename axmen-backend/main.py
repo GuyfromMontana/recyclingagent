@@ -14,6 +14,20 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+# Vapi webhook shared secret. Vapi sends this in the `x-vapi-secret` header
+# (canonical: VapiAI/example-webhook-handler:src/utils/auth.js).
+VAPI_SECRET = os.getenv("VAPI_SECRET", "").strip()
+if not VAPI_SECRET:
+    raise ValueError("VAPI_SECRET environment variable is required")
+
+
+def require_vapi_secret(request: Request) -> None:
+    """Raise 401 if the x-vapi-secret header is missing or doesn't match."""
+    provided = request.headers.get("x-vapi-secret", "")
+    if provided != VAPI_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 # Get Zep API key from environment
 ZEP_API_KEY = os.getenv("ZEP_API_KEY", "").strip()
 
@@ -59,6 +73,7 @@ async def health_check():
 @app.post("/")
 async def handle_vapi_webhook(request: Request):
     """Handle all incoming webhooks from Vapi"""
+    require_vapi_secret(request)
     try:
         payload = await request.json()
         

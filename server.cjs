@@ -18,7 +18,11 @@ app.use(cors());
 app.use(express.json());
 
 // JWT secret
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('JWT_SECRET env var is required');
+  process.exit(1);
+}
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {

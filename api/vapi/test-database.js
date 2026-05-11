@@ -1,26 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireVapiSecret } from '../../lib/vapi-auth.js';
 
 // TEST ENDPOINT - Just fetch some data to see if connection works
 export default async function handler(req, res) {
-  console.log('========================================');
-  console.log('🧪 DATABASE CONNECTION TEST');
-  console.log('========================================');
-
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (!requireVapiSecret(req, res)) return;
 
   try {
-    console.log('🔌 Creating Supabase client...');
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
-    console.log('✅ Client created');
 
     // Test 1: Fetch ALL rows from material_pricing (no filters)
     console.log('\n📊 TEST 1: Fetching ALL from material_pricing...');

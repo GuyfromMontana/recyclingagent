@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireVapiSecret } from '../../lib/vapi-auth.js';
 
 // ============================================
 // GET CALLER INFO - Looks up returning callers
@@ -6,22 +7,15 @@ import { createClient } from '@supabase/supabase-js';
 // ============================================
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req, res) {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  if (!requireVapiSecret(req, res)) return;
 
   try {
     console.log('📥 get-caller-info called:', JSON.stringify(req.body, null, 2));

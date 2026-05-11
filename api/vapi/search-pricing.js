@@ -1,39 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireVapiSecret } from '../../lib/vapi-auth.js';
 
 // ============================================
-// FIXED VERSION - Handles Vapi's data format
+// Handles Vapi's data format for pricing lookups
 // ============================================
 
 export default async function handler(req, res) {
-  console.log('========================================');
-  console.log('🔍 API FUNCTION STARTED');
-  console.log('Time:', new Date().toISOString());
-  console.log('========================================');
-
-  console.log('📨 Request Method:', req.method);
-  console.log('📦 Request Body (raw):', JSON.stringify(req.body, null, 2));
-  
-  console.log('🔐 Environment Check:');
-  console.log('  - SUPABASE_URL exists:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
-  console.log('  - SUPABASE_KEY exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    console.log('✅ OPTIONS request - sending 200');
-    return res.status(200).end();
-  }
-
   if (req.method !== 'POST') {
-    console.log('❌ Wrong method - expected POST, got:', req.method);
-    return res.status(405).json({ 
-      error: 'Method not allowed',
-      received_method: req.method
-    });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  if (!requireVapiSecret(req, res)) return;
 
   try {
     console.log('🚀 Starting main try block');
@@ -88,12 +65,10 @@ export default async function handler(req, res) {
     }
 
     // Initialize Supabase
-    console.log('🔌 Initializing Supabase client...');
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
-    console.log('✅ Supabase client created');
 
     // SPECIAL TEST MODE - if material is "TEST_DATABASE", show all data
     if (material.toUpperCase() === 'TEST_DATABASE' || material.toUpperCase().includes('TEST')) {
