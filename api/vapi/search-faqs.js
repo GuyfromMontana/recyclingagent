@@ -1,14 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
+import OpenAI from 'openai';
 import { requireVapiSecret } from '../../lib/vapi-auth.js';
 
 // ============================================
-// SIMPLIFIED FAQ SEARCH - Uses recycle_knowledge table
+// FAQ SEARCH - Uses recycle_knowledge table
+// Strategy 0: semantic (embeddings) -> Strategy 1/2: keyword/tag fallback
 // No pricing info - redirects pricing questions to callback
 // ============================================
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Semantic search uses OpenAI embeddings + the search_recycle_knowledge_semantic
+// RPC. If OPENAI_API_KEY is missing or the call fails, we silently fall back to
+// keyword matching below, so the tool never hard-fails.
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const SEMANTIC_THRESHOLD = 0.45;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -46,10 +54,21 @@ export default async function handler(req, res) {
     const keywords = extractKeywords(query);
     console.log('🔑 Keywords:', keywords);
 
-    // Strategy 1: Search by keywords in question field
     let result = null;
 
-    if (keywords.length > 0) {
+    // Strategy 0: Semantic search (embeddings). Best for paraphrased questions
+    // that keyword matching misses (e.g. "what'll you give me for my beater").
+    try {
+      result = await semanticSearch(question);
+      if (result) {
+        console.log(`🧠 Semantic match: "${result.question}" (similarity ${Number(result.similarity).toFixed(3)})`);
+      }
+    } catch (e) {
+      console.error('⚠️ Semantic search failed, falling back to keyword:', e.message);
+    }
+
+    // Strategy 1: Keyword search in question field (fallback)
+    if (!result && keywords.length > 0) {
       // Build OR conditions for each keyword
       const conditions = keywords.map(k => `question.ilike.%${k}%`).join(',');
       
@@ -149,4 +168,25 @@ function extractKeywords(text) {
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
     .filter(word => word.length > 2 && !stopWords.includes(word));
+}
+
+// Semantic search: embed the caller's question and query the vector RPC.
+// Returns the top matching row (includes answer_voice) if it clears the
+// threshold, otherwise null so the caller falls back to keyword matching.
+async function semanticSearch(question) {
+  if (!openai) return null;
+  const emb = await openai.embeddings.create({
+    model: 'text-embedding-3-small',
+    input: question,
+  });
+  const { data, error } = await supabase.rpc('search_recycle_knowledge_semantic', {
+    query_embedding: emb.data[0].embedding,
+    match_threshold: SEMANTIC_THRESHOLD,
+    match_count: 3,
+  });
+  if (error) {
+    console.error('❌ semantic RPC error:', error.message);
+    return null;
+  }
+  return data && data.length > 0 ? data[0] : null;
 }
