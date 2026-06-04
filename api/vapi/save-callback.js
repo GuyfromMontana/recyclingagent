@@ -93,7 +93,8 @@ export default async function handler(req, res) {
 
     // Send email notification
     try {
-      const emailResult = await resend.emails.send({
+      const emailResult = await Promise.race([
+        resend.emails.send({
         from: 'Axmen Recycling <callbacks@axmen.com>',
         to: ['guy@axmen.com', 'caleb@axmenrecycling.com', 'jake@axmen.com'],
         subject: `📞 New Callback Request - ${caller_name || caller_phone}`,
@@ -145,7 +146,9 @@ export default async function handler(req, res) {
             </p>
           </div>
         `
-      });
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('resend timeout')), 2500))
+      ]);
 
       console.log('✅ Email sent:', emailResult);
     } catch (emailError) {
@@ -175,6 +178,7 @@ export default async function handler(req, res) {
             `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
             {
               method: 'POST',
+              signal: AbortSignal.timeout(2500),
               headers: {
                 'Authorization': `Basic ${twilioAuth}`,
                 'Content-Type': 'application/x-www-form-urlencoded'
@@ -203,6 +207,7 @@ export default async function handler(req, res) {
       if (GOOGLE_SHEET_WEBHOOK && GOOGLE_SHEET_WEBHOOK !== 'YOUR_APPS_SCRIPT_URL_HERE') {
         const sheetResponse = await fetch(GOOGLE_SHEET_WEBHOOK, {
           method: 'POST',
+          signal: AbortSignal.timeout(2500), // Apps Script webhooks can hang 10-30s; never let that drop the call
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             timestamp: timestamp,
