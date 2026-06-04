@@ -95,6 +95,7 @@ export default async function handler(req, res) {
             is_returning: true,
             caller_name: firstName,
             full_name: callerName,
+            phone_number: data[0].caller_phone || phone, // so the agent doesn't re-ask
             message: `Returning caller: ${firstName}`
           })
         }]
@@ -109,6 +110,7 @@ export default async function handler(req, res) {
         result: JSON.stringify({
           is_returning: false,
           caller_name: null,
+          phone_number: phone, // number they're calling from, so the agent can confirm it
           message: "New caller"
         })
       }]
