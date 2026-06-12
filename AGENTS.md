@@ -28,7 +28,7 @@ This is the **app repo**. The companion repo is `axmen-recycling` (at `C:\Users\
 - Company: Axmen Recycling (dba of Montana Recycling Inc, EIN 37-2143634).
 - Address: 9780 Summit Drive, Missoula, MT 59808.
 - Phone: 406-543-1905.
-- ⚠️ **Hours mismatch still UNRESOLVED (as of 2026-06-12):** the live prompt says "Mon-Fri 8-5, Sat 9-2" (and hardcodes that in an example call); `recycle_knowledge` hours row says "Tue-Sat 8 AM-4 PM"; the deleted admin UI said seasonal Tue-Sat hours. Two of three sources said Tue-Sat. Confirm with Guy, then fix the prompt (via the patcher) AND the FAQ row together.
+- **Hours (RESOLVED 2026-06-12, per Guy):** Mon-Fri 8-5, Sat 8-2, closed Sun — but hours flex with season/weather, so the prompt deliberately does NOT hardcode them. The `recycle_knowledge` FAQ rows are the single source of truth (3 active rows mention hours; all corrected). To change hours, update those rows only — the auto-embed trigger handles re-embedding.
 
 ## Tool routing (the real map)
 
@@ -100,7 +100,6 @@ The assistant snapshot lives at `voice-agent/axmen_assistant.json` in the compan
 ## Backlog (open as of 2026-06-12)
 
 - **🔴 Railway is 502 ("Application failed to respond")** — discovered 2026-06-12, needs the Railway dashboard (no CLI/token on this machine). Likely crash-looping since the 2026-05-11 deploy added the `VAPI_SECRET` startup requirement: if that var was set at the project root instead of the SERVICE card (the classic Railway footgun), `main.py` raises at boot. Check the service's deploy logs for `ValueError: VAPI_SECRET environment variable is required`, set `VAPI_SECRET` + `ZEP_API_KEY` on the service card, redeploy. Symptom while down: calls work fine (tools are Vercel) but transcripts never reach Zep, so returning-caller memory silently stops accumulating.
-- **Resolve the hours mismatch** (needs Guy: which hours are right?) — then patch prompt + FAQ row together.
 - Audit + clean ~13 abandoned Vapi assistants in the org (8 MFC + 5 test).
 - Optionally delete the detached `schedule_callback` tool object (`63b3996e-…`) at the Vapi org level.
 - Optionally drop the unused `customer_messages` / `conversations` tables in Supabase.
