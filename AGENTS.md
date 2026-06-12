@@ -99,6 +99,7 @@ The assistant snapshot lives at `voice-agent/axmen_assistant.json` in the compan
 
 ## Backlog (open as of 2026-06-12)
 
+- **🔴 Railway is 502 ("Application failed to respond")** — discovered 2026-06-12, needs the Railway dashboard (no CLI/token on this machine). Likely crash-looping since the 2026-05-11 deploy added the `VAPI_SECRET` startup requirement: if that var was set at the project root instead of the SERVICE card (the classic Railway footgun), `main.py` raises at boot. Check the service's deploy logs for `ValueError: VAPI_SECRET environment variable is required`, set `VAPI_SECRET` + `ZEP_API_KEY` on the service card, redeploy. Symptom while down: calls work fine (tools are Vercel) but transcripts never reach Zep, so returning-caller memory silently stops accumulating.
 - **Resolve the hours mismatch** (needs Guy: which hours are right?) — then patch prompt + FAQ row together.
 - Audit + clean ~13 abandoned Vapi assistants in the org (8 MFC + 5 test).
 - Optionally delete the detached `schedule_callback` tool object (`63b3996e-…`) at the Vapi org level.
