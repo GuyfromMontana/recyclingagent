@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
-import { requireVapiSecret } from '../../lib/vapi-auth.js';
+import { requireVapiSecret, findToolCall } from '../../lib/vapi-auth.js';
 
 // ============================================
 // FAQ SEARCH - Uses recycle_knowledge table
@@ -28,8 +28,7 @@ export default async function handler(req, res) {
   try {
     console.log('🔍 search-faqs called:', JSON.stringify(req.body, null, 2));
 
-    // Extract from Vapi's nested format
-    const toolCall = req.body.message?.toolCalls?.[0];
+    const toolCall = findToolCall(req, ['search_faqs', 'search-faqs']);
     const toolCallId = toolCall?.id;
     
     // Get the question from various possible locations

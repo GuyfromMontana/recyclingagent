@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { requireVapiSecret } from '../../lib/vapi-auth.js';
+import { requireVapiSecret, findToolCall } from '../../lib/vapi-auth.js';
 
 // ============================================
 // GET CALLER INFO - Looks up returning callers
@@ -20,8 +20,7 @@ export default async function handler(req, res) {
   try {
     console.log('📥 get-caller-info called:', JSON.stringify(req.body, null, 2));
 
-    // Extract from Vapi's nested format
-    const toolCall = req.body.message?.toolCalls?.[0];
+    const toolCall = findToolCall(req, ['get-caller-info', 'get_caller_info']);
     const toolCallId = toolCall?.id;
 
     if (!toolCall) {
@@ -32,7 +31,7 @@ export default async function handler(req, res) {
     // Get the phone number - try multiple sources
     const args = toolCall.function?.arguments || {};
     let phone = args.phone_number || args.caller_phone || args.phone;
-    
+
     // Also try to get from the call object itself
     if (!phone && req.body.message?.call?.customer?.number) {
       phone = req.body.message.call.customer.number;
@@ -40,8 +39,14 @@ export default async function handler(req, res) {
 
     console.log('📞 Looking up phone:', phone);
 
-    if (!phone) {
-      console.log('❌ No phone number provided');
+    // Normalize to bare 10 digits — the format save-callback stores.
+    // Digits-only also keeps the ilike pattern safe for PostgREST (commas/parens
+    // in a raw phone string break the filter grammar).
+    const normalizedPhone = normalizePhone(phone);
+
+    // A short fragment would substring-match unrelated callers; treat as no phone.
+    if (!normalizedPhone || normalizedPhone.length < 7) {
+      console.log('❌ No usable phone number provided');
       return res.status(200).json({
         results: [{
           toolCallId: toolCallId,
@@ -54,15 +59,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // Normalize phone number - remove all non-digits, then handle +1
-    const normalizedPhone = phone.replace(/\D/g, '').replace(/^1/, '');
-    
-    // Search for this phone in callback_requests
-    // Try multiple formats to match
+    // Search for this phone in callback_requests. Substring match so legacy
+    // rows stored as +1XXXXXXXXXX still hit.
     const { data, error } = await supabase
       .from('callback_requests')
       .select('caller_name, caller_phone, material_description, created_at')
-      .or(`caller_phone.ilike.%${normalizedPhone}%,caller_phone.ilike.%${phone}%`)
+      .ilike('caller_phone', `%${normalizedPhone}%`)
       .order('created_at', { ascending: false })
       .limit(1);
 
@@ -85,9 +87,9 @@ export default async function handler(req, res) {
     if (data && data.length > 0 && data[0].caller_name) {
       const callerName = data[0].caller_name;
       const firstName = callerName.split(' ')[0]; // Get first name only
-      
+
       console.log('✅ Found returning caller:', firstName);
-      
+
       return res.status(200).json({
         results: [{
           toolCallId: toolCallId,
@@ -118,9 +120,17 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('💥 Error:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Internal server error',
-      message: error.message 
+      message: error.message
     });
   }
+}
+
+// Strip to digits, drop the country-code 1 from 11-digit numbers.
+function normalizePhone(phone) {
+  if (!phone) return '';
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length === 11 && digits[0] === '1') return digits.slice(1);
+  return digits;
 }

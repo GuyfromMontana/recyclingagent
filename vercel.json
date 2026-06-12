@@ -4,24 +4,9 @@
     {
       "src": "api/**/*.js",
       "use": "@vercel/node"
-    },
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
     }
   ],
   "routes": [
-    {
-      "src": "/api/vapi/search-pricing",
-      "dest": "/api/vapi/search-pricing.js"
-    },
-    {
-      "src": "/api/vapi/save-message",
-      "dest": "/api/vapi/save-message.js"
-    },
     {
       "src": "/api/vapi/save-callback",
       "dest": "/api/vapi/save-callback.js"
@@ -33,13 +18,6 @@
     {
       "src": "/api/vapi/search-faqs",
       "dest": "/api/vapi/search-faqs.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/dist/$1"
     }
   ]
 }
-
-
-
