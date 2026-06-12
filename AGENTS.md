@@ -18,7 +18,7 @@ This is the **app repo**. The companion repo is `axmen-recycling` (at `C:\Users\
 - **DB:** Supabase project **GuyAI** (`oaftnwtmnwsepfhxpuvm`) — NOT the MFC project. Tables: `recycle_knowledge`, `material_pricing`, `callback_requests`.
 - **Voice:** ElevenLabs `eleven_turbo_v2_5` (`6F0d2ON2P4jTXAWS1ohx`, speed 1.1)
 - **STT:** Deepgram nova-2 (conf 0.45)
-- **LLM:** gpt-4o-mini
+- **LLM:** gpt-5.1 (as of 2026-06; check the snapshot in the companion repo, it changes — was gpt-4o-mini, then gpt-4o)
 
 ## Branches & deploy
 - **Production branch is `main`** for this repo. (The companion `axmen-recycling` repo is on `master`.)
